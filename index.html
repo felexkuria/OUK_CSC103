@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartesian vs Polar Coordinates</title>
+    <style>
+        /* MongoDB Design System (LeafyGreen) Inspired CSS */
+        :root {
+            --mongo-green: #00ED64;
+            --mongo-dark-green: #00684A;
+            --mongo-slate: #001E2B;
+            --mongo-light-bg: #F9FBFA;
+            --mongo-border: #E8EDEB;
+            --mongo-text: #3D4F58;
+            --font-family: 'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--mongo-light-bg);
+            color: var(--mongo-slate);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--mongo-border);
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .controls-panel {
+            background-color: var(--mongo-slate);
+            color: white;
+            padding: 40px;
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .controls-panel h2 {
+            margin-top: 0;
+            color: var(--mongo-green);
+            font-size: 24px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="range"] {
+            accent-color: var(--mongo-green);
+            width: 100%;
+        }
+
+        .data-readout {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 20px;
+            border-left: 4px solid var(--mongo-green);
+        }
+
+        .data-readout p {
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 16px;
+        }
+
+        .canvas-panel {
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 1;
+            background-color: white;
+        }
+
+        canvas {
+            border-radius: 12px;
+            border: 2px solid var(--mongo-border);
+            background-color: var(--mongo-light-bg);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="controls-panel">
+            <h2>Vector Dashboard</h2>
+            <p style="color: #A6B8C1; font-size: 14px; margin-bottom: 20px;">Adjust the Polar coordinates to see the Cartesian API compute in real-time.</p>
+
+            <div class="control-group">
+                <label for="magnitude">Magnitude (r): <span id="r-val">100</span></label>
+                <input type="range" id="magnitude" min="10" max="200" value="100">
+            </div>
+
+            <div class="control-group">
+                <label for="angle">Angle (θ in degrees): <span id="theta-val">45</span>°</label>
+                <input type="range" id="angle" min="0" max="360" value="45">
+            </div>
+
+            <div class="data-readout">
+                <p><strong>Polar [r, θ]:</strong> [<span id="out-polar">100, 45°</span>]</p>
+                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.2); margin: 10px 0;">
+                <p><strong>x</strong> = r * cos(θ) = <span id="out-x" style="color: var(--mongo-green);">70.7</span></p>
+                <p><strong>y</strong> = r * sin(θ) = <span id="out-y" style="color: var(--mongo-green);">70.7</span></p>
+                <p><strong>Cartesian [x, y]:</strong> [<span id="out-cartesian">70.7, 70.7</span>]</p>
+            </div>
+        </div>
+
+        <div class="canvas-panel">
+            <canvas id="vectorCanvas" width="400" height="400"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Grab our DOM elements
+        const canvas = document.getElementById('vectorCanvas');
+        const ctx = canvas.getContext('2d');
+        const magInput = document.getElementById('magnitude');
+        const angleInput = document.getElementById('angle');
+
+        // Center of the canvas
+        const originX = canvas.width / 2;
+        const originY = canvas.height / 2;
+
+        // Function to draw the grid and axes
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#E8EDEB';
+            ctx.lineWidth = 1;
+            for(let i = 0; i < canvas.width; i += 50) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+
+            // Draw X and Y Axes
+            ctx.strokeStyle = '#001E2B';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, originY); ctx.lineTo(canvas.width, originY); // X axis
+            ctx.moveTo(originX, 0); ctx.lineTo(originX, canvas.height); // Y axis
+            ctx.stroke();
+        }
+
+        // The core Algorithm: Draw the Vector and compute SOH CAH TOA
+        function renderVector() {
+            const r = parseFloat(magInput.value);
+            let thetaDegrees = parseFloat(angleInput.value);
+            
+            // Computer Math requires Radians, not Degrees!
+            const thetaRadians = thetaDegrees * (Math.PI / 180);
+
+            // Execute SOH CAH TOA API to find X and Y
+            const x = r * Math.cos(thetaRadians);
+            // We subtract y here because HTML Canvas Y-axis goes DOWN, but math Y-axis goes UP
+            const y = r * Math.sin(thetaRadians);
+
+            // 1. Draw Background Grid
+            drawGrid();
+
+            // 2. Draw the Angle Arc (Theta)
+            ctx.beginPath();
+            ctx.arc(originX, originY, 30, 0, -thetaRadians, true);
+            ctx.strokeStyle = '#00684A';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 3. Draw Cartesian Tracing Lines (The "City Blocks")
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#A6B8C1';
+            ctx.beginPath();
+            ctx.moveTo(originX + x, originY);
+            ctx.lineTo(originX + x, originY - y);
+            ctx.lineTo(originX, originY - y);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset dashes
+
+            // 4. Draw the actual Vector (The "Bird's Flight")
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(originX + x, originY - y);
+            ctx.strokeStyle = '#00ED64'; // MongoDB Green
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // Draw a dot at the end of the vector
+            ctx.beginPath();
+            ctx.arc(originX + x, originY - y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#001E2B';
+            ctx.fill();
+
+            // 5. Update the UI Text 
+            document.getElementById('r-val').innerText = r;
+            document.getElementById('theta-val').innerText = thetaDegrees;
+            document.getElementById('out-polar').innerText = `${r}, ${thetaDegrees}°`;
+            document.getElementById('out-x').innerText = x.toFixed(1);
+            document.getElementById('out-y').innerText = y.toFixed(1);
+            document.getElementById('out-cartesian').innerText = `${x.toFixed(1)}, ${y.toFixed(1)}`;
+        }
+
+        // Add event listeners to sliders so it updates in real-time
+        magInput.addEventListener('input', renderVector);
+        angleInput.addEventListener('input', renderVector);
+
+        // Run once on load
+        renderVector();
+    </script>
+</body>
+</html>
