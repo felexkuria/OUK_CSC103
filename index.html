@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cartesian vs Polar Coordinates</title>
+    <title>Unified Vector State Machine with Math Trace</title>
     <style>
-        /* MongoDB Design System (LeafyGreen) Inspired CSS */
+        /* MongoDB Design System (LeafyGreen) */
         :root {
             --mongo-green: #00ED64;
             --mongo-dark-green: #00684A;
             --mongo-slate: #001E2B;
             --mongo-light-bg: #F9FBFA;
             --mongo-border: #E8EDEB;
-            --mongo-text: #3D4F58;
             --font-family: 'Euclid Circular A', 'Helvetica Neue', Helvetica, Arial, sans-serif;
         }
 
@@ -34,9 +33,9 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
             border: 1px solid var(--mongo-border);
             display: flex;
-            flex-direction: row;
+            flex-wrap: wrap;
             overflow: hidden;
-            max-width: 900px;
+            max-width: 1050px;
             width: 100%;
         }
 
@@ -44,16 +43,54 @@
             background-color: var(--mongo-slate);
             color: white;
             padding: 40px;
-            width: 350px;
+            width: 450px;
             display: flex;
             flex-direction: column;
             gap: 20px;
+            box-sizing: border-box;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .controls-panel h2 {
             margin-top: 0;
             color: var(--mongo-green);
             font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        /* Mode Selector Toggle */
+        .mode-selector {
+            background-color: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .mode-selector label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+        }
+
+        /* Input Groups */
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: opacity 0.3s ease;
+        }
+
+        .input-section.disabled {
+            opacity: 0.4;
+            pointer-events: none;
         }
 
         .control-group {
@@ -62,31 +99,60 @@
             gap: 8px;
         }
 
-        label {
-            font-weight: 600;
-            font-size: 14px;
-            letter-spacing: 0.5px;
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         input[type="range"] {
+            flex: 1;
             accent-color: var(--mongo-green);
-            width: 100%;
         }
 
-        .data-readout {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding: 15px;
-            border-radius: 12px;
-            margin-top: 20px;
-            border-left: 4px solid var(--mongo-green);
-        }
-
-        .data-readout p {
-            margin: 5px 0;
+        input[type="number"] {
+            width: 70px;
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid var(--mongo-border);
+            background: white;
+            color: var(--mongo-slate);
             font-family: monospace;
-            font-size: 16px;
+            font-size: 14px;
+            text-align: center;
         }
 
+        .section-title {
+            font-weight: bold;
+            color: var(--mongo-green);
+            margin: 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Execution Trace Panel */
+        .execution-trace {
+            background-color: #000000;
+            color: #A6B8C1;
+            font-family: monospace;
+            font-size: 13px;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--mongo-green);
+            line-height: 1.5;
+        }
+
+        .execution-trace .highlight {
+            color: var(--mongo-green);
+            font-weight: bold;
+        }
+
+        .execution-trace .comment {
+            color: #5C6C75;
+        }
+
+        /* Canvas Panel */
         .canvas-panel {
             padding: 40px;
             display: flex;
@@ -94,12 +160,15 @@
             align-items: center;
             flex: 1;
             background-color: white;
+            box-sizing: border-box;
         }
 
         canvas {
             border-radius: 12px;
             border: 2px solid var(--mongo-border);
             background-color: var(--mongo-light-bg);
+            width: 100%;
+            max-width: 500px;
         }
     </style>
 </head>
@@ -107,127 +176,239 @@
 
     <div class="card">
         <div class="controls-panel">
-            <h2>Vector Dashboard</h2>
-            <p style="color: #A6B8C1; font-size: 14px; margin-bottom: 20px;">Adjust the Polar coordinates to see the Cartesian API compute in real-time.</p>
-
-            <div class="control-group">
-                <label for="magnitude">Magnitude (r): <span id="r-val">100</span></label>
-                <input type="range" id="magnitude" min="10" max="200" value="100">
+            <h2>Vector State Machine</h2>
+            
+            <div class="mode-selector">
+                <label>
+                    <input type="radio" name="mode" value="cartesian" checked> 
+                    Drive w/ Cartesian
+                </label>
+                <label>
+                    <input type="radio" name="mode" value="polar"> 
+                    Drive w/ Polar
+                </label>
             </div>
 
-            <div class="control-group">
-                <label for="angle">Angle (θ in degrees): <span id="theta-val">45</span>°</label>
-                <input type="range" id="angle" min="0" max="360" value="45">
+            <div class="input-section" id="cartesian-section">
+                <p class="section-title">Cartesian Array [x, y]</p>
+                <div class="control-group">
+                    <label>X-Coordinate</label>
+                    <div class="input-row">
+                        <input type="range" id="x-slide" min="-150" max="150" value="80">
+                        <input type="number" id="x-num" value="80">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Y-Coordinate</label>
+                    <div class="input-row">
+                        <input type="range" id="y-slide" min="-150" max="150" value="60">
+                        <input type="number" id="y-num" value="60">
+                    </div>
+                </div>
             </div>
 
-            <div class="data-readout">
-                <p><strong>Polar [r, θ]:</strong> [<span id="out-polar">100, 45°</span>]</p>
-                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.2); margin: 10px 0;">
-                <p><strong>x</strong> = r * cos(θ) = <span id="out-x" style="color: var(--mongo-green);">70.7</span></p>
-                <p><strong>y</strong> = r * sin(θ) = <span id="out-y" style="color: var(--mongo-green);">70.7</span></p>
-                <p><strong>Cartesian [x, y]:</strong> [<span id="out-cartesian">70.7, 70.7</span>]</p>
+            <div class="input-section disabled" id="polar-section">
+                <p class="section-title">Polar Array [r, &theta;]</p>
+                <div class="control-group">
+                    <label>Magnitude (r)</label>
+                    <div class="input-row">
+                        <input type="range" id="r-slide" min="0" max="212" value="100">
+                        <input type="number" id="r-num" value="100" step="0.1">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Angle (&theta;&deg;)</label>
+                    <div class="input-row">
+                        <input type="range" id="theta-slide" min="0" max="360" value="36.9">
+                        <input type="number" id="theta-num" value="36.9" step="0.1">
+                    </div>
+                </div>
             </div>
+
+            <div class="execution-trace" id="math-trace">
+                </div>
+
         </div>
 
         <div class="canvas-panel">
-            <canvas id="vectorCanvas" width="400" height="400"></canvas>
+            <canvas id="vectorCanvas" width="500" height="500"></canvas>
         </div>
     </div>
 
     <script>
-        // Grab our DOM elements
+        // DOM Elements setup
         const canvas = document.getElementById('vectorCanvas');
         const ctx = canvas.getContext('2d');
-        const magInput = document.getElementById('magnitude');
-        const angleInput = document.getElementById('angle');
-
-        // Center of the canvas
         const originX = canvas.width / 2;
         const originY = canvas.height / 2;
 
-        // Function to draw the grid and axes
+        const modeRadios = document.querySelectorAll('input[name="mode"]');
+        const cartesianSection = document.getElementById('cartesian-section');
+        const polarSection = document.getElementById('polar-section');
+        const mathTrace = document.getElementById('math-trace');
+
+        // Inputs
+        const xSlide = document.getElementById('x-slide'), xNum = document.getElementById('x-num');
+        const ySlide = document.getElementById('y-slide'), yNum = document.getElementById('y-num');
+        const rSlide = document.getElementById('r-slide'), rNum = document.getElementById('r-num');
+        const thetaSlide = document.getElementById('theta-slide'), thetaNum = document.getElementById('theta-num');
+
+        let currentMode = 'cartesian';
+
+        // Listen for Mode Switch
+        modeRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                currentMode = e.target.value;
+                if (currentMode === 'cartesian') {
+                    cartesianSection.classList.remove('disabled');
+                    polarSection.classList.add('disabled');
+                } else {
+                    polarSection.classList.remove('disabled');
+                    cartesianSection.classList.add('disabled');
+                }
+                executeAlgorithm();
+            });
+        });
+
+        // Sync functions
+        function bindInputs(slider, numBox, callback) {
+            slider.addEventListener('input', () => {
+                numBox.value = slider.value;
+                callback();
+            });
+            numBox.addEventListener('input', () => {
+                slider.value = numBox.value;
+                callback();
+            });
+        }
+
+        bindInputs(xSlide, xNum, executeAlgorithm);
+        bindInputs(ySlide, yNum, executeAlgorithm);
+        bindInputs(rSlide, rNum, executeAlgorithm);
+        bindInputs(thetaSlide, thetaNum, executeAlgorithm);
+
         function drawGrid() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw grid lines
             ctx.strokeStyle = '#E8EDEB';
             ctx.lineWidth = 1;
             for(let i = 0; i < canvas.width; i += 50) {
                 ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
             }
-
-            // Draw X and Y Axes
             ctx.strokeStyle = '#001E2B';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(0, originY); ctx.lineTo(canvas.width, originY); // X axis
-            ctx.moveTo(originX, 0); ctx.lineTo(originX, canvas.height); // Y axis
+            ctx.moveTo(0, originY); ctx.lineTo(canvas.width, originY);
+            ctx.moveTo(originX, 0); ctx.lineTo(originX, canvas.height);
             ctx.stroke();
         }
 
-        // The core Algorithm: Draw the Vector and compute SOH CAH TOA
-        function renderVector() {
-            const r = parseFloat(magInput.value);
-            let thetaDegrees = parseFloat(angleInput.value);
-            
-            // Computer Math requires Radians, not Degrees!
-            const thetaRadians = thetaDegrees * (Math.PI / 180);
+        // Main Program Loop
+        function executeAlgorithm() {
+            let x, y, r, thetaDegrees, traceHTML;
 
-            // Execute SOH CAH TOA API to find X and Y
-            const x = r * Math.cos(thetaRadians);
-            // We subtract y here because HTML Canvas Y-axis goes DOWN, but math Y-axis goes UP
-            const y = r * Math.sin(thetaRadians);
+            if (currentMode === 'cartesian') {
+                x = parseFloat(xNum.value) || 0;
+                y = parseFloat(yNum.value) || 0;
 
-            // 1. Draw Background Grid
+                // 1. Math processing
+                const xSq = x * x;
+                const ySq = y * y;
+                const sumSq = xSq + ySq;
+                r = Math.sqrt(sumSq);
+
+                let thetaRadians = Math.atan2(y, x);
+                thetaDegrees = thetaRadians * (180 / Math.PI);
+                if (thetaDegrees < 0) thetaDegrees += 360;
+
+                // 2. Update UI
+                rSlide.value = r; rNum.value = r.toFixed(1);
+                thetaSlide.value = thetaDegrees; thetaNum.value = thetaDegrees.toFixed(1);
+
+                // 3. Generate Step-by-Step Execution Trace
+                traceHTML = `
+                    <div class="comment">// 1. Execute Pythagorean Algorithm</div>
+                    <div>r = &radic;(x&sup2; + y&sup2;)</div>
+                    <div>r = &radic;((${x})&sup2; + (${y})&sup2;)</div>
+                    <div>r = &radic;(${xSq.toFixed(1)} + ${ySq.toFixed(1)})</div>
+                    <div>r = &radic;(${sumSq.toFixed(1)})</div>
+                    <div class="highlight">r = ${r.toFixed(2)}</div>
+                    <br>
+                    <div class="comment">// 2. Execute Inverse Tangent</div>
+                    <div>&theta; = atan(y / x)</div>
+                    <div>&theta; = atan(${y} / ${x})</div>
+                    <div>&theta; = ${(thetaRadians).toFixed(3)} rad</div>
+                    <div class="highlight">&theta; = ${thetaDegrees.toFixed(1)}&deg;</div>
+                `;
+            } 
+            else {
+                r = parseFloat(rNum.value) || 0;
+                thetaDegrees = parseFloat(thetaNum.value) || 0;
+                let thetaRadians = thetaDegrees * (Math.PI / 180);
+
+                // 1. Math processing
+                x = r * Math.cos(thetaRadians);
+                y = r * Math.sin(thetaRadians);
+
+                // 2. Update UI
+                xSlide.value = x; xNum.value = x.toFixed(1);
+                ySlide.value = y; yNum.value = y.toFixed(1);
+
+                // 3. Generate Step-by-Step Execution Trace
+                traceHTML = `
+                    <div class="comment">// 1. Execute SOH (Sine) for Y</div>
+                    <div>y = r * sin(&theta;)</div>
+                    <div>y = ${r} * sin(${thetaDegrees}&deg;)</div>
+                    <div class="highlight">y = ${y.toFixed(2)}</div>
+                    <br>
+                    <div class="comment">// 2. Execute CAH (Cosine) for X</div>
+                    <div>x = r * cos(&theta;)</div>
+                    <div>x = ${r} * cos(${thetaDegrees}&deg;)</div>
+                    <div class="highlight">x = ${x.toFixed(2)}</div>
+                `;
+            }
+
+            // Inject the string into the UI terminal
+            mathTrace.innerHTML = traceHTML;
+
+            // --- Render the Graphics ---
             drawGrid();
 
-            // 2. Draw the Angle Arc (Theta)
+            // Arc for Angle
             ctx.beginPath();
-            ctx.arc(originX, originY, 30, 0, -thetaRadians, true);
+            let arcRad = thetaDegrees * (Math.PI / 180);
+            ctx.arc(originX, originY, 40, 0, -arcRad, true);
             ctx.strokeStyle = '#00684A';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // 3. Draw Cartesian Tracing Lines (The "City Blocks")
+            // Cartesian Path (Dashed)
             ctx.setLineDash([5, 5]);
             ctx.strokeStyle = '#A6B8C1';
             ctx.beginPath();
-            ctx.moveTo(originX + x, originY);
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(originX + x, originY);
             ctx.lineTo(originX + x, originY - y);
-            ctx.lineTo(originX, originY - y);
             ctx.stroke();
-            ctx.setLineDash([]); // Reset dashes
+            ctx.setLineDash([]); 
 
-            // 4. Draw the actual Vector (The "Bird's Flight")
+            // The Vector Magnitude Line
             ctx.beginPath();
             ctx.moveTo(originX, originY);
             ctx.lineTo(originX + x, originY - y);
-            ctx.strokeStyle = '#00ED64'; // MongoDB Green
+            ctx.strokeStyle = '#00ED64'; 
             ctx.lineWidth = 4;
             ctx.stroke();
 
-            // Draw a dot at the end of the vector
+            // Destination Dot
             ctx.beginPath();
             ctx.arc(originX + x, originY - y, 6, 0, Math.PI * 2);
             ctx.fillStyle = '#001E2B';
             ctx.fill();
-
-            // 5. Update the UI Text 
-            document.getElementById('r-val').innerText = r;
-            document.getElementById('theta-val').innerText = thetaDegrees;
-            document.getElementById('out-polar').innerText = `${r}, ${thetaDegrees}°`;
-            document.getElementById('out-x').innerText = x.toFixed(1);
-            document.getElementById('out-y').innerText = y.toFixed(1);
-            document.getElementById('out-cartesian').innerText = `${x.toFixed(1)}, ${y.toFixed(1)}`;
         }
 
-        // Add event listeners to sliders so it updates in real-time
-        magInput.addEventListener('input', renderVector);
-        angleInput.addEventListener('input', renderVector);
-
-        // Run once on load
-        renderVector();
+        // Initialize compiler on launch
+        executeAlgorithm();
     </script>
 </body>
 </html>
